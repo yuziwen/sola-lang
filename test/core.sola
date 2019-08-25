@@ -1,0 +1,36 @@
+;; #lang sola ;; modules not supported yet
+;; this is a comment
+
+;; source files should be structual, and use structual editor to edit it.
+;; but for now just use s-expr and use Racket's reader to parse it.
+
+
+
+;; arithmetic expressions
+
+(+ 1 2 3) ;; just like Racket
+(test (+ 1 2 3) 6)
+
+;; top level variable definition
+
+(let x (* 1 2 3)) ;; x = 6
+(test x 6)
+
+;; function
+
+(let f (fn (x) (+ x 1)))
+(test* [(f 2) 3] ;; run multiple tests
+       [(f x) 7])
+
+;; assignment
+
+(set! x 0)
+(test x 0)
+
+;; local variable
+
+(test (begin
+        (let x 1)
+        (set! x 2)
+        (f x))
+      3)

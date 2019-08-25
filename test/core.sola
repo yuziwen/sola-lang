@@ -1,4 +1,4 @@
-(module test-core sola/core 
+(lang sola
 ;; this is a comment
 ;; modules not supported yet, the first line will be ignored
 

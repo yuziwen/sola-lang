@@ -8,5 +8,6 @@ It is a Lisp-like language but aims at exploring new features,
 also, maybe, educational purposes.
 
 Actually I just want to find somethings to do
-in the boring high school :p\\
+in the boring high school :p
+
 Enjoy yourself!

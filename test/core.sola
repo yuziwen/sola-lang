@@ -1,9 +1,11 @@
-;; #lang sola ;; modules not supported yet
+(module test-core sola/core 
 ;; this is a comment
+;; modules not supported yet, the first line will be ignored
+
 
 ;; source files should be structual, and use structual editor to edit it.
 ;; but for now just use s-expr and use Racket's reader to parse it.
-
+;; reference at ../racket/parser.rkt
 
 
 ;; arithmetic expressions
@@ -34,3 +36,5 @@
         (set! x 2)
         (f x))
       3)
+
+)

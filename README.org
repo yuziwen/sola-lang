@@ -1,10 +1,12 @@
-#+TITLE: the Sola Language Project
+#+TITLE: the Sola Programming Language
 #+OPTIONS: toc:nil
 
 This is my own programming language called sola
 which I have just begun to work on.
 
-It is a Lisp-like language but aims at exploring new features.
+It is a Lisp-like language but aims at exploring new features,
+also, maybe, educational purposes.
 
 Actually I just want to find somethings to do
-in the boring high school :p
+in the boring high school :p\\
+Enjoy yourself!

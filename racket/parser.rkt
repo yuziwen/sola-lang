@@ -1,7 +1,7 @@
 #lang racket
 
 (provide (combine-out
-          (struct-out Stx)
+          (struct-out Parsed)
           (struct-out FilePos)
           sola-parse-from-s-expr
           sola-parse-from-port
@@ -11,17 +11,17 @@
 
 ;; my syntax representation
 
-(struct Stx (datum pos) #:transparent)
+(struct Parsed (pos datum) #:transparent)
 (struct FilePos (line col) #:transparent)
 
-(define (racket-syntax->Stx r-stx)
+(define (racket-syntax->Parsed r-stx)
   (define pos (FilePos (syntax-line r-stx)
                        (syntax-column r-stx)))
   (match (syntax-e r-stx)
     [(? list? s)
-     (Stx (map racket-syntax->Stx s) pos)]
+     (Parsed pos (map racket-syntax->Parsed s))]
     [s  ;; raw value, not support vector etc.
-     (Stx s pos)]))
+     (Parsed pos s)]))
 
 
 
@@ -30,23 +30,23 @@
 ;; complete parse function interfaces
 
 (define (sola-parse-from-s-expr s-expr)
-  (racket-syntax->Stx (datum->syntax #'() s-expr)))
+  (racket-syntax->Parsed (datum->syntax #'() s-expr)))
 
 (define (sola-parse-from-port port)
   (read-syntax (object-name port) port))
 
 (define (sola-parse-from-string str)
   (define port (open-input-string str))
-  (racket-syntax->Stx (sola-parse-from-port port)))
+  (racket-syntax->Parsed (sola-parse-from-port port)))
 
 
 (define (read-file path)
   (define port (open-input-file path))
   (port-count-lines! port)
-  (define stx (sola-parse-from-port port))
+  (define parsed (sola-parse-from-port port))
   (close-input-port port)
-  stx)
+  parsed)
 
 (define (sola-parse-from-file path)
-  (racket-syntax->Stx (read-file path)))
+  (racket-syntax->Parsed (read-file path)))
 

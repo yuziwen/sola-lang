@@ -1,12 +1,11 @@
 #lang racket
 
-(provide (combine-out
-          (struct-out Parsed)
-          (struct-out FilePos)
-          sola-parse-from-s-expr
-          sola-parse-from-port
-          sola-parse-from-string
-          sola-parse-from-file))
+(provide (struct-out Parsed)
+         (struct-out FilePos)
+         sola-parse-from-s-expr
+         sola-parse-from-port
+         sola-parse-from-string
+         sola-parse-from-file)
 
 
 ;; my syntax representation

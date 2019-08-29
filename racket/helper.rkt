@@ -14,3 +14,9 @@
   (for/fold ([acc h])
             ([k (in-list key*)])
     (hash-remove acc k)))
+
+(define-match-expander ->
+  (λ (stx)
+    (syntax-case stx ()
+      [(_ proc var* ...)
+       #'(app proc var* ...)])))

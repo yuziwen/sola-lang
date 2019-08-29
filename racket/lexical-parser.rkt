@@ -7,9 +7,7 @@
          (struct-out Bracket)
          (struct-out Brace)
          (struct-out SelfEval)
-         lex-parse-from-s-expr
-         lex-parse-from-port
-         lex-parse-from-file)
+         lex-parse)
 
 
 
@@ -24,13 +22,12 @@
 
 (define (pos->string pos)
   (cond
-    [(not (Pos-line pos)) ;; do not have source info
-     "#f"]
+    [(number? pos) (number->string pos)]
     [else (string-append (number->string (Pos-line pos))
                          ":"
                          (number->string (Pos-col pos)))]))
 
-
+;; pos: positive-integer or Pos struct
 (struct Lex (pos datum) #:transparent)
 
 (struct Square Lex () #:transparent)
@@ -39,14 +36,17 @@
 
 (struct SelfEval Lex () #:transparent)
 
-
-(define (racket-syntax->Lex r-stx)
-  (define pos (Pos (syntax-line r-stx)
-                   (syntax-column r-stx)))
+;; lex-parse-racket-syntax :: syntax -> Lex
+(define (lex-parse-racket-syntax r-stx)
+  (define pos
+    (if (syntax-line r-stx)
+        (Pos (syntax-line r-stx)
+             (syntax-column r-stx))
+        (syntax-position r-stx)))
   (match (syntax-e r-stx)
     [(? list? s)
      (define (LexNode ctor)
-       (ctor pos (map racket-syntax->Lex s)))
+       (ctor pos (map lex-parse-racket-syntax s)))
 
      (case (syntax-property r-stx 'paren-shape)
        [(#f) (LexNode Square)]
@@ -56,14 +56,10 @@
     [s (SelfEval pos s)]))
 
 
-
-;; complete parse function interfaces
-
-(define (lex-parse-from-s-expr s-expr)
-  (racket-syntax->Lex (datum->syntax #'() s-expr)))
+;; other parse function interfaces
 
 (define (lex-parse-from-port port)
-  (read-syntax (object-name port) port))
+  (lex-parse-racket-syntax (read-syntax (object-name port) port)))
 
 
 (define (read-file path)
@@ -74,4 +70,12 @@
   lex)
 
 (define (lex-parse-from-file path)
-  (racket-syntax->Lex (read-file path)))
+  (lex-parse-racket-syntax (read-file path)))
+
+(define (lex-parse in)
+  (cond
+    [(syntax? in) (lex-parse-racket-syntax in)]
+    [(path-string? in) (lex-parse-from-file in)]
+    [(port? in) (lex-parse-from-port in)]
+    [else (raise-argument-error
+           'lex-parse "(or syntax? path-string? port?" in)]))

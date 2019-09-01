@@ -15,8 +15,10 @@
             ([k (in-list key*)])
     (hash-remove acc k)))
 
-(define-match-expander ->
+
+;; mutable and transparent struct
+(define-syntax mtstruct
   (λ (stx)
     (syntax-case stx ()
-      [(_ proc var* ...)
-       #'(app proc var* ...)])))
+      [(_ expr* ...)
+       #'(struct expr* ... #:mutable #:transparent)])))

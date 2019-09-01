@@ -3,62 +3,58 @@
 (require "./lexical-parser.rkt"
          "./helper.rkt")
 
-(provide (all-defined-out)
-         (all-from-out "./lexical-parser.rkt"
-                       "./helper.rkt"))
+(provide (except-out (all-defined-out) ast->s-expr p)
+         (all-from-out "./lexical-parser.rkt"))
 
 
-;; grammar syntax tree
+;; for test convenience
+(define (p in)
+  (ast->s-expr
+   (grammar-parse
+    (lexical-parse in))))
 
-(struct Gram (raw-pos) #:transparent)
+;; abstract syntax tree
 
-(struct Value Gram (val) #:transparent)
+(struct Ast (raw-pos) #:transparent)
 
-(struct Num Value () #:transparent)
-(struct Bool Value () #:transparent)
-(struct Str Value () #:transparent)
-(struct Sym Value () #:transparent)
+(mtstruct Value Ast (val))
+
+(mtstruct Num Value ())
+(mtstruct Bool Value ())
+(mtstruct Str Value ())
+(mtstruct Sym Value ())
 
 
-(struct Var Gram (name) #:transparent)
+(struct Var Ast (name) #:transparent)
 
 
 ;; syntax structure
-(struct Stx Gram () #:transparent)
+(mtstruct Stx Ast ())
 
-(struct Fn Stx (param* body) #:transparent)
+(mtstruct Fn Stx (param* body))
 
-(struct Let Stx (lhs* rhs* body) #:transparent)
+(mtstruct Let Stx (lhs* rhs* body))
 
-(struct Letrec Stx (lhs* rhs* body) #:transparent)
+(mtstruct Letrec Stx (lhs* rhs* body))
 
-(struct Begin Stx (def* body*) #:transparent)
+(mtstruct Begin Stx (def* body*))
 
-(struct If Stx (test then alt) #:transparent)
+(mtstruct If Stx (test then alt))
 
-(struct Set! Stx (lhs rhs) #:transparent)
+(mtstruct Set! Stx (lhs rhs))
 
-(struct Define Stx (lhs rhs) #:transparent)
+(mtstruct Define Stx (lhs rhs))
 
-(struct App Stx (fn arg*) #:transparent)
+(mtstruct App Stx (fn arg*))
 
 
 (define (reserved-word? sym)
   (memq sym '(fn let letrec begin if set! define)))
 
-;; gram-parse :: Lex -> Gram
-(define (gram-parse lex)
-  (define parse gram-parse)
-  ;; (define (check-identifier! x id-name pos)
-  ;;   (cond
-  ;;     [(symbol? x) (void)]
-  ;;     [else (raise-syntax-error
-  ;;            'grammar-parse
-  ;;            (string-append id-name
-  ;;                           " at position "
-  ;;                           (pos->string pos)
-  ;;                           " should be an identifier")
-  ;;            x)]))
+;; grammar-parse :: Lex -> Ast
+(define (grammar-parse lex)
+
+  (define self grammar-parse)
 
   (match lex
     [(SelfEval pos x)
@@ -86,7 +82,7 @@
                    (Square p*-pos
                            (list (SelfEval p-pos* param*)
                                  ...))
-                   (-> parse body)))
+                   (app self body)))
      #:when (andmap symbol? param*)
      (Fn pos
          (map (λ (pos p) (Var pos p))
@@ -99,11 +95,10 @@
       (list (SelfEval _ let/rec)
             (Square _ (list (Bracket
                              _ (list (SelfEval lhs-pos* lhs*)
-                                     (-> parse rhs*)))
+                                     (app self rhs*)))
                             ...))
-            (-> parse body)))
-     #:when (and (or (eq? let/rec 'let)
-                     (eq? let/rec 'letrec))
+            (app self body)))
+     #:when (and (memq let/rec '(let letrec))
                  (andmap symbol? lhs*))
      (define ctor (if (eq? let/rec 'let) Let Letrec))
      (ctor pos
@@ -114,7 +109,7 @@
     ;; begin expression
     [(Square pos
              (list (SelfEval _ 'begin)
-                   (-> parse body*) ...))
+                   (app self body*) ...))
      (define internal-def*
        (filter (λ (expr) (Define? expr))
                body*))
@@ -125,34 +120,108 @@
     ;; if expression
     [(Square pos
              (list (SelfEval _ 'if)
-                   (-> parse test)
-                   (-> parse then)
-                   (-> parse alt)))
+                   (app self test)
+                   (app self then)
+                   (app self alt)))
      (If pos test then alt)]
 
     ;; set! or define expression
     [(Square pos
              (list (SelfEval _ set/define)
                    (SelfEval lhs-pos lhs)
-                   (-> parse rhs)))
-     #:when (and (or (eq? set/define 'set!)
-                     (eq? set/define 'define))
+                   (app self rhs)))
+     #:when (and (memq set/define '(set! define))
                  (symbol? lhs))
      (define ctor (if (eq? set/define 'set!) Set! Define))
-     (ctor pos (Var lhs-pos lhs) rhs)]
+     (define result (ctor pos (Var lhs-pos lhs) rhs))
+     result]
 
     ;; function apply expression
     [(Square pos
              (list (? (λ (f)
                         (not (reserved-word?
                               (Lex-datum f))))
-                      (-> parse func))
-                   (-> parse arg*)
+                      (app self func))
+                   (app self arg*)
                    ...))
      (App pos func arg*)]
 
     [x  ;; else
      (raise-syntax-error
-      'gram-parse "unrecognized syntax" x)]))
+      'grammar-parse "unrecognized syntax" x)]))
 
-;; (define (p s) (gram-parse (lex-parse s)))
+
+
+
+
+(define (ast->s-expr ast)
+
+  (define str-out
+    (open-output-string))
+  (define (printf . arg*)
+    (apply fprintf str-out arg*))
+
+  (define (show ast)
+    (match ast
+      [(Num pos x) (printf "(Num:~v ~v) " pos x)]
+      [(Bool pos x) (printf "(Bool:~v ~v) " pos x)]
+      [(Str pos x) (printf "(Str:~v ~v) " pos x)]
+      [(Sym pos x) (printf "(Sym:~v ~v) " pos x)]
+      [(Var pos name) (printf "(Var:~v ~v) " pos name)]
+      [(Fn pos param* body)
+       (printf "(Fn:~v (" pos)
+       (for ([p (in-list param*)])
+         (show p))
+       (printf ") ")
+       (show body)
+       (printf ") ")]
+      [(or (Let pos lhs* rhs* body)
+           (Letrec pos lhs* rhs* body))
+       (printf "(~a:~v ("
+               (if (Let? ast) "Let" "Letrec")
+               pos)
+       (for ([lhs (in-list lhs*)]
+             [rhs (in-list rhs*)])
+         (printf "[")
+         (show lhs)
+         (printf " ")
+         (show rhs)
+         (printf "]"))
+       (printf ") ")
+       (show body)
+       (printf ") ")]
+      [(Begin pos def* body*)
+       (printf "(Begin:~v (" pos)
+       (for ([def (in-list def*)])
+         (show def))
+       (printf ") ")
+       (for ([body (in-list body*)])
+         (show body))
+       (printf ") ")]
+      [(If pos test then alt)
+       (printf "(If:~v " pos)
+       (show test)
+       (show then)
+       (show alt)
+       (printf ") ")]
+      [(Set! pos lhs rhs)
+       (printf "(Set!:~v " pos)
+       (show lhs)
+       (show rhs)
+       (printf ") ")]
+      [(Define pos lhs rhs)
+       (printf "(Define:~v " pos)
+       (show lhs)
+       (show rhs)
+       (printf ") ")]
+      [(App pos fn arg*)
+       (printf "(App:~v " pos)
+       (for ([a (in-list (cons fn arg*))])
+         (show a))
+       (printf ") ")]))
+
+  (show ast)
+
+  (define str-in
+    (open-input-string (get-output-string str-out)))
+  (read str-in))

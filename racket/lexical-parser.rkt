@@ -7,7 +7,7 @@
          (struct-out Bracket)
          (struct-out Brace)
          (struct-out SelfEval)
-         lex-parse)
+         lexical-parse)
 
 
 
@@ -72,10 +72,10 @@
 (define (lex-parse-from-file path)
   (lex-parse-racket-syntax (read-file path)))
 
-(define (lex-parse in)
+(define (lexical-parse in)
   (cond
     [(syntax? in) (lex-parse-racket-syntax in)]
     [(path-string? in) (lex-parse-from-file in)]
     [(port? in) (lex-parse-from-port in)]
     [else (raise-argument-error
-           'lex-parse "(or syntax? path-string? port?" in)]))
+           'lexical-parse "(or syntax? path-string? port?)" in)]))

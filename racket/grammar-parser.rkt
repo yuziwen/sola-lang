@@ -4,7 +4,8 @@
          "./helper.rkt")
 
 (provide (except-out (all-defined-out) ast->s-expr p)
-         (all-from-out "./lexical-parser.rkt"))
+         ;; in lexical-parser.rkt
+         pos->string lexical-parse)
 
 
 ;; for test convenience

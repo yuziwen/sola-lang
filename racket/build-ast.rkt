@@ -1,106 +1,99 @@
 #lang racket
 
-(require "./parser.rkt"
-         "./helper.rkt"
-         racket/hash)
+;; this file has been deprecated
+;; and will be removed when this feature is implemented
+
+(require (rename-in "./grammar-parser.rkt"
+                    [Fn old-Fn])
+         "./helper.rkt")
+
+(provide (all-defined-out))
 
 
-;; Ast structure
+(module vars racket
+  (require "./helper.rkt"
+           racket/hash
+           (rename-in "./grammar-parser.rkt"
+                      [Fn old-Fn]))
 
-(struct Ast (raw-pos) ;; position in source file
-  #:transparent)
-
-
-;; Value ::  (raw-pos, val) -> Value
-(struct Value Ast (val) #:transparent)
-
-(struct Num Value () #:transparent)
-(struct Bool Value () #:transparent)
-(struct Str Value () #:transparent)
-(struct Sym Value () #:transparent)
-
-
-
-;; non-keyword-symbols are vars
-
-;; def: VarDef
-(struct VarRef Ast (def) #:transparent)
-
-;; name: symbol ;; refs: set of VarRef
-(struct VarDef Ast (name refs) #:transparent)
+  (provide/contract
+   #:exists (Vars VarRef-set)
+   [new-vars (->* ()
+                  ((listof symbol?)
+                   (listof VarRef-set))
+                  Vars)]
+   [vars-ref (-> Vars symbol? VarRef-set)]
+   [vars-add-ref (-> Vars symbol? VarRef-set Vars)]
+   [vars-add-ref* (-> Vars symbol? (listof VarRef-set) Vars)]
+   [vars-union (->* (Vars) () #:rest (listof Vars)
+                    Vars)]
+   [vars-rem* (-> Vars (listof symbol?) Vars)]
+   [vars-sub (-> Vars Vars Vars)])
 
 
+  ;; def: VarDef
+  (struct VarRef Var (def) #:transparent)
 
-;; syntax structure
-(struct Stx Ast () #:transparent)
+  ;; refs: VarRef-set
+  (struct VarDef Var (refs) #:transparent)
 
-;; param*: list of VarDef ;; body: Ast
-;; fvs: set of VarRef
-(struct Fn Stx (param* body fvs) #:transparent)
+  (define (new-VarRef-set) (mutable-seteq))
+  (define (VarRef-set-union!) )
 
-;; lhs*: list of VarDef ;; rhs*: list of Ast
-;; body: Ast
-(struct Local Stx (lhs* rhs* body) #:transparent)
+  ;; the set of vars (actually a hash table)
+  ;; the keys form a set, the values are refs of those keys
+  ;; vars :: (hasheq symbol -> (set of VarRef))
 
-;; Expr*: list of Ast
-(struct Begin Stx (expr*) #:transparent)
+  (define (new-vars [var* '()] [refs* '()])
+    (apply hasheq (interleave var* refs*)))
 
-;; test, then, else: Ast
-(struct If Stx (test then else) #:transparent)
+  (define (vars-ref vars sym)
+    (hash-ref vars sym
+              (λ () (mutable-seteq))))
 
-;; lhs: VarRef ;; rhs: Ast
-(struct Set! Stx (lhs rhs) #:transparent)
+  (define (vars-add-ref vars var refs)
+    (cond
+      [(hash-has-key? vars var)
+       (hash-update vars var
+                    (λ (refs2) (set-union! refs2 refs)))]
+      [else (hash-set vars var refs)]))
 
-;; lhs: VarDef ;; rhs: Ast
-(struct Let Stx (lhs rhs) #:transparent)
+  (define (vars-add-ref* vars var* refs*)
+    (cond
+      [(null? var*) vars]
+      [else (vars-add-ref*
+             (vars-add-ref vars (car var*) (car refs*))
+             (cdr var*) (cdr refs*))]))
 
-;; fn: Ast ;; arg*: list of Ast
-(struct App Stx (fn arg*) #:transparent)
+  (define (vars-union vars1 . vars-rest*)
+    (define (union2 vars1 vars2)
+      (hash-union vars1 vars2
+                  ;; keys conflict
+                  #:combine set-union))
+    (cond
+      [(null? vars-rest*) vars1]
+      [else (apply vars-union
+                   (union2 vars1 (car vars-rest*))
+                   (cdr vars-rest*))]))
+
+  (define (vars-rem* vars key*)
+    (hash-remove* vars key*))
+
+  (define (vars-sub vars1 vars2)
+    (vars-rem* vars1 (hash-keys vars2)))
+
+  ;; vars module end
+  )
+
+(require 'vars)
 
 
 
-;; the set of vars (actually a hash table)
-;; the keys form a set, the values are refs of those keys
-;; vars :: (hasheq symbol -> (set of VarRef))
-(define (new-vars [var* '()] [refs* '()])
-  (apply hasheq (interleave var* refs*)))
 
-(define (vars-ref vars sym)
-  (hash-ref vars sym
-            (λ () (mutable-seteq))))
+;; fvs: vars struct, free variables in body
+(struct Fn old-Fn (fvs) #:transparent)
 
-(define (vars-add-ref vars var refs)
-  (cond
-    [(hash-has-key? vars var)
-     (hash-update vars var
-                  (λ (refs2) (set-union! refs2 refs)))]
-    [else (hash-set vars var refs)]))
-
-(define (vars-add-ref* vars var* refs*)
-  (cond
-    [(null? var*) vars]
-    [else (vars-add-ref* (vars-add-ref vars (car var*) (car refs*))
-                     (cdr var*) (cdr refs*))]))
-
-;; (define (vars-add vars sym)
-;;   )
-
-(define (vars-union vars1 . vars-rest*)
-  (define (union2 vars1 vars2)
-    (hash-union vars1 vars2
-                ;; keys conflict
-                #:combine set-union))
-  (cond
-    [(null? vars-rest*) vars1]
-    [else (apply vars-union
-                 (union2 vars1 (car vars-rest*))
-                 (cdr vars-rest*))]))
-
-(define (vars-rem* vars key*)
-  (hash-remove* vars key*))
-
-(define (vars-sub vars1 vars2)
-  (vars-rem* vars1 (hash-keys vars2)))
+;; others remain the same
 
 
 ;; the environment hash
@@ -114,8 +107,6 @@
 (define (env-ref env var)
   (hash-ref env var))
 
-;; for testing convenience
-(define (b s-expr) (build-ast (sola-parse-from-s-expr s-expr)))
 
 ;; naming conventions
 ;; abc* :: list abc ;; abcs :: set abc or `vars` struct

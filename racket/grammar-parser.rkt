@@ -16,7 +16,14 @@
 
 ;; abstract syntax tree
 
-(struct Ast (raw-pos) #:transparent)
+(extras-new-key! 'pos)
+
+
+(struct Ast (ex) #:transparent)
+
+(define (Ast-pos ast)
+  (exref (Ast-ex ast) 'pos))
+
 
 (mtstruct Value Ast (val))
 
@@ -56,14 +63,16 @@
 (define (grammar-parse lex)
 
   (define self grammar-parse)
+  (define (ex pos)
+    (newex '(pos) (list pos)))
 
   (match lex
     [(SelfEval pos x)
      (cond
-       [(number? x) (Num pos x)]
-       [(boolean? x) (Bool pos x)]
-       [(string? x) (Str pos x)]
-       [(symbol? x) (Var pos x)]
+       [(number? x) (Num (ex pos) x)]
+       [(boolean? x) (Bool (ex pos) x)]
+       [(string? x) (Str (ex pos) x)]
+       [(symbol? x) (Var (ex pos) x)]
        [else (raise-syntax-error
               'grammar-parse
               (string-append
@@ -75,7 +84,7 @@
              (list (SelfEval _ 'quote)
                    (SelfEval sym-pos sym)))
      #:when (symbol? sym)
-     (Sym pos sym)]
+     (Sym (ex pos) sym)]
 
     ;; fn expression
     [(Square pos
@@ -85,8 +94,8 @@
                                  ...))
                    (app self body)))
      #:when (andmap symbol? param*)
-     (Fn pos
-         (map (λ (pos p) (Var pos p))
+     (Fn (ex pos)
+         (map (λ (pos p) (Var (ex pos) p))
               p-pos* param*)
          body)]
 
@@ -102,8 +111,8 @@
      #:when (and (memq let/rec '(let letrec))
                  (andmap symbol? lhs*))
      (define ctor (if (eq? let/rec 'let) Let Letrec))
-     (ctor pos
-           (map (λ (pos lhs) (Var pos lhs))
+     (ctor (ex pos)
+           (map (λ (pos lhs) (Var (ex pos) lhs))
                 lhs-pos* lhs*)
            rhs* body)]
 
@@ -116,7 +125,7 @@
                body*))
      (match-define (list (Define _ def-var* _) ...)
        internal-def*)
-     (Begin pos def-var* body*)]
+     (Begin (ex pos) def-var* body*)]
 
     ;; if expression
     [(Square pos
@@ -124,7 +133,7 @@
                    (app self test)
                    (app self then)
                    (app self alt)))
-     (If pos test then alt)]
+     (If (ex pos) test then alt)]
 
     ;; set! or define expression
     [(Square pos
@@ -134,7 +143,7 @@
      #:when (and (memq set/define '(set! define))
                  (symbol? lhs))
      (define ctor (if (eq? set/define 'set!) Set! Define))
-     (define result (ctor pos (Var lhs-pos lhs) rhs))
+     (define result (ctor (ex pos) (Var lhs-pos lhs) rhs))
      result]
 
     ;; function apply expression
@@ -145,7 +154,7 @@
                       (app self func))
                    (app self arg*)
                    ...))
-     (App pos func arg*)]
+     (App (ex pos) func arg*)]
 
     [x  ;; else
      (raise-syntax-error

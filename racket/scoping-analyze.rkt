@@ -3,7 +3,9 @@
 (require "./helper.rkt"
          "./grammar-parser.rkt")
 
-(provide (all-defined-out))
+(provide (all-defined-out)
+         (all-from-out "./helper.rkt"
+                       "./grammar-parser.rkt"))
 
 
 ;; extended Ast structures
@@ -47,8 +49,8 @@
 
   (define (Var->VarDef var)
     (match var
-      [(Var pos name)
-       (VarDef pos name (empty-VarRef-set))]
+      [(Var ex name)
+       (VarDef ex name (empty-VarRef-set))]
       [var
        (raise-syntax-error
         'Var->VarDef
@@ -56,68 +58,68 @@
         var)]))
 
   (match x
-    [(Value pos val) x]
+    [(Value ex val) x]
 
-    [(Var pos name)
+    [(Var ex name)
      (define vdef (env-ref env name))
-     (define vref (VarRef pos name vdef))
+     (define vref (VarRef ex name vdef))
      (set-add! (VarDef-refs vdef) vref)
      vref]
 
-    [(Fn pos (list (app Var->VarDef vdef*) ...) old-body)
+    [(Fn ex (list (app Var->VarDef vdef*) ...) old-body)
      (define body
        (scoping-analyze (env-ext* env vdef*)
                         old-body))
-     (Fn pos vdef* body)]
+     (Fn ex vdef* body)]
 
-    [(Let pos
+    [(Let ex
           (list (app Var->VarDef lhs*) ...)
           (list (app self rhs*) ...)
           (app self body))
-     (Let pos lhs* rhs* body)]
+     (Let ex lhs* rhs* body)]
 
-    [(Letrec pos
+    [(Letrec ex
              (list (app Var->VarDef lhs*) ...)
              old-rhs* old-body)
      (define new-env (env-ext* env lhs*))
      (define rhs* (map (curry scoping-analyze new-env)
                        old-rhs*))
      (define body (scoping-analyze new-env old-body))
-     (Letrec pos lhs* rhs* body)]
+     (Letrec ex lhs* rhs* body)]
 
-    [(Begin pos
+    [(Begin ex
             (list (app Var->VarDef def*) ...)
             old-body*)
      (define new-env
        (env-ext* env def*))
      (define body* (map (curry scoping-analyze new-env)
                         old-body*))
-     (Begin pos def* body*)]
+     (Begin ex def* body*)]
 
-    [(If pos
+    [(If ex
          (app self test)
          (app self then)
          (app self alt))
-     (If pos test then alt)]
+     (If ex test then alt)]
 
-    [(Set! pos
+    [(Set! ex
            (app Var->VarDef lhs)
            (app self rhs))
-     (Set! pos lhs rhs)]
+     (Set! ex lhs rhs)]
 
-    [(Define pos
-       (Var vpos name)
+    [(Define ex
+       (Var v-ex name)
        (app self rhs))
      (define lhs (env-ref env name))
      ;; ensure they are `eq?`
-     (unless (equal? vpos (Ast-raw-pos lhs))
+     (unless (equal? v-ex (Ast-pos lhs))
        (raise-syntax-error
         'scoping-analyze
         "unkown error: lhs of define expression got redefined"
         x))
-     (Define pos lhs rhs)]
+     (Define ex lhs rhs)]
 
-    [(App pos
+    [(App ex
           (app self fn)
           (list (app self arg*) ...))
-     (App pos fn arg*)]))
+     (App ex fn arg*)]))

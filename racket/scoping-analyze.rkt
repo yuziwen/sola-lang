@@ -106,9 +106,15 @@
      (Set! pos lhs rhs)]
 
     [(Define pos
-       (app Var->VarDef lhs)
+       (Var vpos name)
        (app self rhs))
-     (env-set! env lhs)
+     (define lhs (env-ref env name))
+     ;; ensure they are `eq?`
+     (unless (equal? vpos (Ast-raw-pos lhs))
+       (raise-syntax-error
+        'scoping-analyze
+        "unkown error: lhs of define expression got redefined"
+        x))
      (Define pos lhs rhs)]
 
     [(App pos

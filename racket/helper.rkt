@@ -49,6 +49,49 @@
   (-> extras/c symbol? any/c)
   (hash-ref extras key))
 
+(define/contract (exref! extras key to-set)
+  (-> extras/c symbol? any/c any/c)
+  (hash-ref! extras key to-set))
+
 (define/contract (exset! extras key val)
   (-> extras/c symbol? any/c any/c)
   (hash-set! extras key val))
+
+
+
+;; Weak-ref struct
+;; similar to shared_ptr in C++ to manage memory
+;; it is like weak-box but references are freed immediately
+;; after the object becomes unreachable
+;; (by manually call weak-ref-taget-delete!
+;;  to free it from global table)
+;; so eliminate the need to call collect-garbage
+
+;; hash of any object to set of -Weak-ref
+(define weak-global-table (make-hasheq))
+
+
+(struct -Weak-ref (obj [exist? #:mutable]))
+
+;; field accessor
+(define/contract (weak-deref ref)
+  (-> -Weak-ref? any)
+  (if (-Weak-ref-exist? ref)
+      (-Weak-ref-obj ref)
+      (void)))
+
+;; constructor
+(define (new-weak-ref obj)
+  (define ref (-Weak-ref obj #t))
+  (define weak-refs
+    (hash-ref! weak-global-table
+               obj
+               (weak-seteq)))
+  (set-add! weak-refs ref)
+  ref)
+
+(define (weak-ref-target-delete! obj)
+  (define s (hash-ref weak-global-table obj (weak-seteq)))
+  (for ([ref (in-weak-set s)])
+    (set--Weak-ref-exist?! ref #f))
+  (hash-remove! weak-global-table obj))
